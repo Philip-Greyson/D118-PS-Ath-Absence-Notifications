@@ -22,7 +22,7 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
 
 SCHOOL_CODES = ['5']
 TEACHER_ROLE_NAMES = ['Lead Teacher', 'Co-teacher']  # the role names of the teachers that we want to include in the emails. These are found in roledef.name
-ATTENDANCE_CODES = ['AB', 'HA', 'UH', 'UN', 'MH']
+ATTENDANCE_CODES = {'AB': 'Excused Absence Full Day', 'UN': 'Unexcused Absence Full Day', 'MH': 'Mental Health Day', 'SS': 'Suspension', 'ASP': 'Alternative Study Program'}
 
 if __name__ == '__main__':  # main file execution
     with open('ath_abs_notifs_log.txt', 'w') as log:  # open logging file
@@ -162,16 +162,44 @@ if __name__ == '__main__':  # main file execution
                                                     cur.execute('SELECT att.att_code FROM ps_attendance_daily att LEFT JOIN students s ON s.id = att.studentid WHERE s.student_number = :student AND att.schoolid = :school AND att.att_date = :today', student=studentNum, school=schoolCode, today=todaysDate)
                                                     absences = cur.fetchall()
                                                     for absence in absences:
-                                                        print(f'DBUG: Student {studentNum} has an absence with code {absence[0]}')  # debug
-                                                        print(f'DBUG: Student {studentNum} has an absence with code {absence[0]}', file=log)  # debug
-                                                        if absence[0] in ATTENDANCE_CODES:  # if the attendance code matches one of the ones we are looking for
-                                                            absenceList.append(f'{studentNum} - {studentName}')  # add the student number and number in a single string to the absence list
+                                                        absenceCode = absence[0]
+                                                        print(f'DBUG: Student {studentNum} has an absence with code {absenceCode}')  # debug
+                                                        print(f'DBUG: Student {studentNum} has an absence with code {absenceCode}', file=log)  # debug
+                                                        if absenceCode in ATTENDANCE_CODES.keys():  # if the attendance code matches one of the ones we are looking for
+                                                            absenceList.append(f'{studentNum} - {studentName}: {ATTENDANCE_CODES.get(absenceCode)}\n')  # add the student number and number as well as the absence code in a single string to the absence list
                                                 except Exception as er:
                                                     print(f'ERROR while finding absences for student {studentNum} in section {section} of activity {activity}: {er}')
                                                     print(f'ERROR while finding absences for student {studentNum} in section {section} of activity {activity}: {er}', file=log)
                                             if absenceList:  # if there are any absences
                                                 print(f'INFO: Sending emails about absences for the following students: {absenceList}')
                                                 print(f'INFO: Sending emails about absences for the following students: {absenceList}', file=log)
+                                                absenceString = ''
+                                                for entry in absenceList:
+                                                    absenceString += entry
+                                                print(absenceString)
+                                                todaysDatecode = datetime.now().strftime('%m/%d/%y')
+                                                print(todaysDatecode)
+                                                try:  # send the email
+                                                    mime_message = EmailMessage()  # create an email message object
+                                                    # define headers
+                                                    mime_message['To'] = toEmail # who the email gets sent to
+                                                    mime_message['Subject'] = f'Ineligible Students to participate in {activity} for {todaysDatecode}'  # subject line of the email
+                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activity}. The following students are ineligible to participate today because of absences for more than 50% of the day. Please reach out to Mark Ribbens for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
+                                                    # encoded message
+                                                    encoded_message = base64.urlsafe_b64encode(mime_message.as_bytes()).decode()
+                                                    create_message = {'raw': encoded_message}
+                                                    send_message = (service.users().messages().send(userId="me", body=create_message).execute())
+                                                    print(f'DBUG: Email sent, message ID: {send_message["id"]}') # print out resulting message Id
+                                                    print(f'DBUG: Email sent, message ID: {send_message["id"]}', file=log)
+                                                except HttpError as er:   # catch Google API http errors, get the specific message and reason from them for better logging
+                                                    status = er.status_code
+                                                    details = er.error_details[0]  # error_details returns a list with a dict inside of it, just strip it to the first dict
+                                                    print(f'ERROR {status} from Google API while sending email to {toEmail}: {details["message"]}. Reason: {details["reason"]}')
+                                                    print(f'ERROR {status} from Google API while sending email to {toEmail}: {details["message"]}. Reason: {details["reason"]}', file=log)
+                                                except Exception as er:
+                                                    print(f'ERROR while trying to send email to {toEmail} absences in section {section} of activity {activity}: {er}')
+                                                    print(f'ERROR while trying to send email to {toEmail} absences in section {section} of activity {activity}: {er}', file=log)
+
                                         except Exception as er:
                                             print(f'ERROR while processing student or teacher info to get absences for section {section} of activity {activity}: {er}')
                                             print(f'ERROR while processing student or teacher info to get absences for section {section} of activity {activity}: {er}', file=log)
