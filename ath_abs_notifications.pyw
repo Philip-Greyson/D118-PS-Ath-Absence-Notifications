@@ -139,7 +139,9 @@ if __name__ == '__main__':  # main file execution
                             # now that we have found the courses, sections for those courses, and student and teacher info in each section, we look for absences of students per section and send emails to the section teacher
                             for activity in courseDict.keys():  # get the list of course names and go through them one at a time
                                 try:
-                                    print(f'INFO: Starting activity {activity}')
+                                    activityPrefix = {'ACT': 'Activity: ', 'ATH': 'Athletics: '}
+                                    activityProper = activityPrefix.get(activity.split('-')[0]) + activity.split('-')[1].title()
+                                    print(f'DBUG: Starting activity {activityProper}')
                                     sections = courseDict.get(activity).keys()
                                     for section in sections:  # go through each section of the current activity
                                         try:
@@ -183,8 +185,8 @@ if __name__ == '__main__':  # main file execution
                                                     mime_message = EmailMessage()  # create an email message object
                                                     # define headers
                                                     mime_message['To'] = toEmail # who the email gets sent to
-                                                    mime_message['Subject'] = f'Ineligible Students to participate in {activity} for {todaysDatecode}'  # subject line of the email
-                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activity}. The following students are ineligible to participate today because of absences for more than 50% of the day.\nPlease reach out to the athletic department for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
+                                                    mime_message['Subject'] = f'Ineligible Students to participate in {activityProper} for {todaysDatecode}'  # subject line of the email
+                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activityProper}. The following students are ineligible to participate today because of absences for more than 50% of the day.\nPlease reach out to the athletic department for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
                                                     # encoded message
                                                     encoded_message = base64.urlsafe_b64encode(mime_message.as_bytes()).decode()
                                                     create_message = {'raw': encoded_message}
