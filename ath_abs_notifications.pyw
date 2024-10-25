@@ -20,7 +20,7 @@ print(f"Username: {DB_UN} | Password: {DB_PW} | Server: {DB_CS}")  # debug so we
 # Google API Scopes that will be used. If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
 
-SCHOOL_CODES = ['5']
+SCHOOL_CODES = ['5','1003', '1004']
 TEACHER_ROLE_NAMES = ['Lead Teacher', 'Co-teacher']  # the role names of the teachers that we want to include in the emails. These are found in roledef.name
 ATTENDANCE_CODES = {'AB': 'Excused Absence Full Day', 'UN': 'Unexcused Absence Full Day', 'MH': 'Mental Health Day', 'SS': 'Suspension', 'ASP': 'Alternative Study Program'}
 
@@ -60,24 +60,34 @@ if __name__ == '__main__':  # main file execution
         with oracledb.connect(user=DB_UN, password=DB_PW, dsn=DB_CS) as con:  # create the connecton to the database
             with con.cursor() as cur:  # start an entry
                 for schoolCode in SCHOOL_CODES:
+                    termlist = []  # make an empty list for valid terms per building
                     try:
                         termid = None
-                        cur.execute("SELECT id, firstday, lastday, schoolid, dcid FROM terms WHERE schoolid = :school AND isyearrec = 0 ORDER BY dcid DESC", school=schoolCode)  # get a list of terms for the school, filtering to not full years
+                        cur.execute("SELECT id, firstday, lastday, schoolid, dcid, isyearrec FROM terms WHERE schoolid = :school ORDER BY dcid DESC", school=schoolCode)  # get a list of terms for the school, filtering to not full years
                         terms = cur.fetchall()
                         for term in terms:  # go through every term
                             termStart = term[1]
                             termEnd = term[2]
+                            isYear = term[5]
                             #compare todays date to the start and end dates
                             if ((termStart < today) and (termEnd > today)):
                                 termid = str(term[0])
                                 termDCID = str(term[4])
-                                print(f'INFO: Found good term: {termid} | {termDCID}')
-                                print(f'INFO: Found good term: {termid} | {termDCID}', file=log)
+                                if isYear == 1:  # if the term we found is marked as a full year term
+                                    print(f'DBUG: Found yearlong term at building {schoolCode}: {termid} | {termDCID}')
+                                    print(f'DBUG: Found yearlong term at building {schoolCode}: {termid} | {termDCID}', file=log)
+                                    # termlist.append(termid)  # add the term to the list we will iterate through. Comment out to ignore yearlong terms
+                                else:
+                                    print(f'DBUG: Found good term at building {schoolCode}: {termid} | {termDCID}')
+                                    print(f'DBUG: Found good term at building {schoolCode}: {termid} | {termDCID}', file=log)
+                                    termlist.append(termid)  # add the term to the list we will iterate through. Comment out to ignore quarters, semesters, etc
                     except Exception as er:
                         print(f'ERROR while finding current term in building {schoolCode}: {er}')
                         print(f'ERROR while finding current term in building {schoolCode}: {er}', file=log)
-                    # check to see if we found a valid term before we continue
-                    if termid:
+                    # go through all the valid terms we found
+                    for termid in termlist:
+                        print(f'DBUG: Starting term {termid} at building {schoolCode}')
+                        print(f'DBUG: Starting term {termid} at building {schoolCode}', file=log)
                         courseList = []  # make an empty list that will contain the course dicts inside it and student dict
                         courseDict = {}
                         try:  # find all courses with ath (athletics) or act (activities) in the name
@@ -157,6 +167,7 @@ if __name__ == '__main__':  # main file execution
                                                 else:
                                                     toEmail += f', {email}'
                                             print(f'DBUG: Emails for section {section} in activity {activity} will be sent to "{toEmail}"')
+                                            print(f'DBUG: Emails for section {section} in activity {activity} will be sent to "{toEmail}"', file=log)
                                             students = courseDict.get(activity).get(section).get('Students').items()  # get the student number and name pairings as tuples
                                             for studentNum, studentName in students:
                                                 try:
