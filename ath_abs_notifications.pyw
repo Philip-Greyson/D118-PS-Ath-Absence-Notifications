@@ -176,15 +176,15 @@ if __name__ == '__main__':  # main file execution
                                                 absenceString = ''
                                                 for entry in absenceList:
                                                     absenceString += entry
-                                                print(absenceString)
+                                                # print(absenceString)
                                                 todaysDatecode = datetime.now().strftime('%m/%d/%y')
-                                                print(todaysDatecode)
+                                                # print(todaysDatecode)
                                                 try:  # send the email
                                                     mime_message = EmailMessage()  # create an email message object
                                                     # define headers
                                                     mime_message['To'] = toEmail # who the email gets sent to
                                                     mime_message['Subject'] = f'Ineligible Students to participate in {activity} for {todaysDatecode}'  # subject line of the email
-                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activity}. The following students are ineligible to participate today because of absences for more than 50% of the day. Please reach out to Mark Ribbens for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
+                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activity}. The following students are ineligible to participate today because of absences for more than 50% of the day.\nPlease reach out to the athletic department for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
                                                     # encoded message
                                                     encoded_message = base64.urlsafe_b64encode(mime_message.as_bytes()).decode()
                                                     create_message = {'raw': encoded_message}
