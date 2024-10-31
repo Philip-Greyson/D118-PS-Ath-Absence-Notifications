@@ -21,8 +21,9 @@ print(f"Username: {DB_UN} | Password: {DB_PW} | Server: {DB_CS}")  # debug so we
 SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
 
 SCHOOL_CODES = ['5','1003', '1004']
+IGNORE_FULLYEAR_TERMS = False
 TEACHER_ROLE_NAMES = ['Lead Teacher', 'Co-teacher']  # the role names of the teachers that we want to include in the emails. These are found in roledef.name
-ATTENDANCE_CODES = {'AB': 'Excused Absence Full Day', 'UN': 'Unexcused Absence Full Day', 'MH': 'Mental Health Day', 'SS': 'Suspension', 'ASP': 'Alternative Study Program'}
+ATTENDANCE_CODES = {'AB': 'Excused Absence Full Day', 'UN': 'Unexcused Absence Full Day', 'UA': 'Unexcused Absence Full Day', 'SS': 'Suspension', 'ASP': 'Alternative Study Program', 'ISS': 'In School Study'}
 
 if __name__ == '__main__':  # main file execution
     with open('ath_abs_notifs_log.txt', 'w') as log:  # open logging file
@@ -73,10 +74,10 @@ if __name__ == '__main__':  # main file execution
                             if ((termStart < today) and (termEnd > today)):
                                 termid = str(term[0])
                                 termDCID = str(term[4])
-                                if isYear == 1:  # if the term we found is marked as a full year term
+                                if isYear == 1 and not IGNORE_FULLYEAR_TERMS:  # if the term we found is marked as a full year term and we arent ignoring them
                                     print(f'DBUG: Found yearlong term at building {schoolCode}: {termid} | {termDCID}')
                                     print(f'DBUG: Found yearlong term at building {schoolCode}: {termid} | {termDCID}', file=log)
-                                    # termlist.append(termid)  # add the term to the list we will iterate through. Comment out to ignore yearlong terms
+                                    termlist.append(termid)  # add the term to the list we will iterate through. Comment out to ignore yearlong terms or set IGNORE_FULLYEAR_TERMS to True
                                 else:
                                     print(f'DBUG: Found good term at building {schoolCode}: {termid} | {termDCID}')
                                     print(f'DBUG: Found good term at building {schoolCode}: {termid} | {termDCID}', file=log)
@@ -99,7 +100,7 @@ if __name__ == '__main__':  # main file execution
                                     courseName = course[1]
                                     # print(course)  # debug
                                     # next find all students in the current course in the currend term
-                                    cur.execute('SELECT students.student_number, students.first_name, students.last_name, cc.sectionid FROM cc LEFT JOIN students ON cc.studentid = students.id WHERE cc.course_number = :course AND cc.termid = :term', course=courseNum, term=termid)
+                                    cur.execute('SELECT students.student_number, students.first_name, students.last_name, cc.sectionid FROM cc LEFT JOIN students ON cc.studentid = students.id WHERE cc.course_number = :course AND cc.termid = :term AND cc.schoolid = :school', course=courseNum, term=termid, school=schoolCode)
                                     students = cur.fetchall()
                                     sectionsDict = {}  # dict for each section that will contain section ID, student list, and teachers info
                                     for student in students:
@@ -224,5 +225,5 @@ if __name__ == '__main__':  # main file execution
                             print(f'ERROR while finding courses with ATH or ACT in their names: {er}', file=log)
         endTime = datetime.now()
         endTime = endTime.strftime('%H:%M:%S')
-        print(f'INFO: Execution started at {endTime}')
-        print(f'INFO: Execution started at {endTime}', file=log)
+        print(f'INFO: Execution ended at {endTime}')
+        print(f'INFO: Execution ended at {endTime}', file=log)
