@@ -1,3 +1,4 @@
 ath_abs_notifs_log.txt
 *.json
 ruff.toml
+courses.csv

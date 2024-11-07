@@ -20,7 +20,7 @@ print(f"Username: {DB_UN} | Password: {DB_PW} | Server: {DB_CS}")  # debug so we
 # Google API Scopes that will be used. If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
 
-SCHOOL_CODES = ['5','1003', '1004']
+SCHOOL_CODES = ['5']
 IGNORE_FULLYEAR_TERMS = False
 TEACHER_ROLE_NAMES = ['Lead Teacher', 'Co-teacher']  # the role names of the teachers that we want to include in the emails. These are found in roledef.name
 ATTENDANCE_CODES = {'AB': 'Excused Absence Full Day', 'UN': 'Unexcused Absence Full Day', 'UA': 'Unexcused Absence Full Day', 'SS': 'Suspension', 'ASP': 'Alternative Study Program', 'ISS': 'In School Study'}
@@ -70,7 +70,7 @@ if __name__ == '__main__':  # main file execution
                             termStart = term[1]
                             termEnd = term[2]
                             isYear = term[5]
-                            #compare todays date to the start and end dates
+                            # compare todays date to the start and end dates
                             if ((termStart < today) and (termEnd > today)):
                                 termid = str(term[0])
                                 termDCID = str(term[4])
@@ -92,57 +92,72 @@ if __name__ == '__main__':  # main file execution
                         courseList = []  # make an empty list that will contain the course dicts inside it and student dict
                         courseDict = {}
                         try:  # find all courses with ath (athletics) or act (activities) in the name
-                            cur.execute("SELECT course_number, course_name FROM courses WHERE (instr(course_name, 'ATH-') > 0 OR instr(course_name, 'ACT-') > 0)")
+                            cur.execute("SELECT c.course_number, c.course_name, c.dcid, ext.activity_start, ext.activity_end FROM courses c LEFT JOIN u_def_ext_courses ext ON c.dcid = ext.coursesdcid WHERE (instr(c.course_name, 'ATH-') > 0 OR instr(c.course_name, 'ACT-') > 0)")
                             courses = cur.fetchall()
                             for course in courses:
                                 try:
                                     courseNum = course[0]
                                     courseName = course[1]
-                                    # print(course)  # debug
-                                    # next find all students in the current course in the currend term
-                                    cur.execute('SELECT students.student_number, students.first_name, students.last_name, cc.sectionid FROM cc LEFT JOIN students ON cc.studentid = students.id WHERE cc.course_number = :course AND cc.termid = :term AND cc.schoolid = :school', course=courseNum, term=termid, school=schoolCode)
-                                    students = cur.fetchall()
-                                    sectionsDict = {}  # dict for each section that will contain section ID, student list, and teachers info
-                                    for student in students:
-                                        try:
-                                            # print(student)
-                                            studentNum = str(int(student[0]))
-                                            studentFirst = student[1]
-                                            studentLast = student[2]
-                                            studentName = f'{studentFirst} {studentLast}'
-                                            sectionID = student[3]  # section ID for the section that student is enrolled in
-                                            # print(f'DBUG: Starting student {studentNum} in section {sectionID}')  # debug
-                                            if not sectionsDict.get(sectionID):  # the first time we get a new section, need to initialize its sub-dicts
-                                                # print(f'DBUG: No entry exists in the dict for section ID {sectionID}, initializing it')  # debug
-                                                sectionsDict.update({sectionID: {'Teachers': {}, 'Students': {}}})
-                                            # print(f'DBUG: Current sectionsDict looks like: {sectionsDict}')  # debug
-                                            studentDict = sectionsDict.get(sectionID).get('Students')  # get the current student list
-                                            studentDict.update({studentNum: studentName})  # add the student to the list of students in the current section
-                                            try:
-                                                # print(f'DBUG: Curent teachers sub-dict: {sectionsDict.get(sectionID).get('Teachers')}')  # debug
-                                                if not sectionsDict.get(sectionID).get('Teachers').keys():  # if we dont have any entries in the teachers list, we need to find them
-                                                    # print(f'DBUG: No teacher info found for section {sectionID}, finding them')  # debug
-                                                    teacherDict = {}
-                                                    # find the teachers and co-teachers for the section
-                                                    cur.execute('SELECT u.email_addr, u.lastfirst, rd.name FROM sectionteacher st LEFT JOIN roledef rd ON st.roleid = rd.id LEFT JOIN schoolstaff staff ON st.teacherid = staff.id LEFT JOIN users u ON staff.users_dcid = u.dcid WHERE st.sectionid = :section', section=sectionID)
-                                                    teachers = cur.fetchall()
-                                                    for teacher in teachers:
-                                                        if teacher[2] in TEACHER_ROLE_NAMES:  # only add them to the teacher dict if they are one of the roles we want to notify
-                                                            if not teacherDict.get(teacher[0]):  # if they dont already exist in the teacher dict
-                                                                teacherDict.update({teacher[0]: teacher[1]})
-                                                else:
-                                                    teacherDict = sectionsDict.get(sectionID).get('Teachers')
-                                            except Exception as er:
-                                                print(f'ERROR while finding teacher dictionary or teacher info for section {sectionID} of course {courseName}: {er}')
-                                                print(f'ERROR while finding teacher dictionary or teacher info for section {sectionID} of course {courseName}: {er}', file=log)
+                                    courseDCID = course[2]
+                                    activityStart = course[3]
+                                    activityEnd = course[4]
+                                    # print(f'{courseDCID},{courseName},{activityStart},{activityEnd}')  # debug to print out all course names and dcids
+                                    # compare todays date to the start and end dates
+                                    if activityStart and activityEnd:  # first check if there are even dates in the custom fields
+                                        if ((activityStart < today) and (activityEnd > today)):
+                                            print(f'DBUG: Course {courseName} with DCID {courseDCID} is currently in season, continuing')
+                                            print(f'DBUG: Course {courseName} with DCID {courseDCID} is currently in season, continuing', file=log)
+                                            # next find all students in the current course in the current term if the activity is active
+                                            cur.execute('SELECT students.student_number, students.first_name, students.last_name, cc.sectionid FROM cc LEFT JOIN students ON cc.studentid = students.id WHERE cc.course_number = :course AND cc.termid = :term AND cc.schoolid = :school', course=courseNum, term=termid, school=schoolCode)
+                                            students = cur.fetchall()
+                                            sectionsDict = {}  # dict for each section that will contain section ID, student list, and teachers info
+                                            for student in students:
+                                                try:
+                                                    # print(student)
+                                                    studentNum = str(int(student[0]))
+                                                    studentFirst = student[1]
+                                                    studentLast = student[2]
+                                                    studentName = f'{studentFirst} {studentLast}'
+                                                    sectionID = student[3]  # section ID for the section that student is enrolled in
+                                                    # print(f'DBUG: Starting student {studentNum} in section {sectionID}')  # debug
+                                                    if not sectionsDict.get(sectionID):  # the first time we get a new section, need to initialize its sub-dicts
+                                                        # print(f'DBUG: No entry exists in the dict for section ID {sectionID}, initializing it')  # debug
+                                                        sectionsDict.update({sectionID: {'Teachers': {}, 'Students': {}}})
+                                                    # print(f'DBUG: Current sectionsDict looks like: {sectionsDict}')  # debug
+                                                    studentDict = sectionsDict.get(sectionID).get('Students')  # get the current student list
+                                                    studentDict.update({studentNum: studentName})  # add the student to the list of students in the current section
+                                                    try:
+                                                        # print(f'DBUG: Curent teachers sub-dict: {sectionsDict.get(sectionID).get('Teachers')}')  # debug
+                                                        if not sectionsDict.get(sectionID).get('Teachers').keys():  # if we dont have any entries in the teachers list, we need to find them
+                                                            # print(f'DBUG: No teacher info found for section {sectionID}, finding them')  # debug
+                                                            teacherDict = {}
+                                                            # find the teachers and co-teachers for the section
+                                                            cur.execute('SELECT u.email_addr, u.lastfirst, rd.name FROM sectionteacher st LEFT JOIN roledef rd ON st.roleid = rd.id LEFT JOIN schoolstaff staff ON st.teacherid = staff.id LEFT JOIN users u ON staff.users_dcid = u.dcid WHERE st.sectionid = :section', section=sectionID)
+                                                            teachers = cur.fetchall()
+                                                            for teacher in teachers:
+                                                                if teacher[2] in TEACHER_ROLE_NAMES:  # only add them to the teacher dict if they are one of the roles we want to notify
+                                                                    if not teacherDict.get(teacher[0]):  # if they dont already exist in the teacher dict
+                                                                        teacherDict.update({teacher[0]: teacher[1]})
+                                                        else:
+                                                            teacherDict = sectionsDict.get(sectionID).get('Teachers')
+                                                    except Exception as er:
+                                                        print(f'ERROR while finding teacher dictionary or teacher info for section {sectionID} of course {courseName}: {er}')
+                                                        print(f'ERROR while finding teacher dictionary or teacher info for section {sectionID} of course {courseName}: {er}', file=log)
 
-                                            sectionsDict.update({sectionID: {'Students': studentDict, 'Teachers': teacherDict}})  # do the update with the new student and teacher info (if applicble) to the sections dict
-                                        except Exception as er:
-                                            print(f'ERROR while processing student {student[0]} in section {sectionID} of course {courseName}: {er}')
-                                            print(f'ERROR while processing student {student[0]} in section {sectionID} of course {courseName}: {er}', file=log)
-                                    if sectionsDict:  # if we found any sections with students in them, update the overall course dict with that section sub-dict
-                                        # print(sectionsDict)  # debug
-                                        courseDict.update({courseName: sectionsDict})
+                                                    sectionsDict.update({sectionID: {'Students': studentDict, 'Teachers': teacherDict}})  # do the update with the new student and teacher info (if applicble) to the sections dict
+                                                except Exception as er:
+                                                    print(f'ERROR while processing student {student[0]} in section {sectionID} of course {courseName}: {er}')
+                                                    print(f'ERROR while processing student {student[0]} in section {sectionID} of course {courseName}: {er}', file=log)
+                                            if sectionsDict:  # if we found any sections with students in them, update the overall course dict with that section sub-dict
+                                                # print(sectionsDict)  # debug
+                                                courseDict.update({courseName: sectionsDict})
+                                        else:
+                                            print(f'WARN: Course {courseName} with DCID {courseDCID} is NOT currently in season')
+                                            print(f'WARN: Course {courseName} with DCID {courseDCID} is NOT currently in season', file=log)
+                                    else:
+                                        print(f'WARN: Course {courseName} with DCID {courseDCID} has no dates entered for its start and end times')
+                                        print(f'WARN: Course {courseName} with DCID {courseDCID} has no dates entered for its start and end times', file=log)
+                                    
                                 except Exception as er:
                                     print(f'ERROR while finding sections of course {courseName}: {er}')
                                     print(f'ERROR while finding sections of course {courseName}: {er}', file=log)
@@ -185,8 +200,8 @@ if __name__ == '__main__':  # main file execution
                                                     print(f'ERROR while finding absences for student {studentNum} in section {section} of activity {activity}: {er}')
                                                     print(f'ERROR while finding absences for student {studentNum} in section {section} of activity {activity}: {er}', file=log)
                                             if absenceList:  # if there are any absences
-                                                print(f'INFO: Sending emails about absences for the following students: {absenceList}')
-                                                print(f'INFO: Sending emails about absences for the following students: {absenceList}', file=log)
+                                                print(f'INFO: Sending emails to {toEmail} about absences for the following students: {absenceList}')
+                                                print(f'INFO: Sending emails to {toEmail} about absences for the following students: {absenceList}', file=log)
                                                 absenceString = ''
                                                 for entry in absenceList:
                                                     absenceString += entry
