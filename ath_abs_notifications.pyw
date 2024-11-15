@@ -22,7 +22,7 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.compose']
 
 SCHOOL_CODES = ['5']
 IGNORE_FULLYEAR_TERMS = False
-TEACHER_ROLE_NAMES = ['Lead Teacher', 'Co-teacher']  # the role names of the teachers that we want to include in the emails. These are found in roledef.name
+TEACHER_ROLE_NAMES = ['Teacher', 'Additional Teacher']  # the role names of the teachers that we want to include in the emails. These are found in roledef.name
 ATTENDANCE_CODES = {'AB': 'Excused Absence Full Day', 'UN': 'Unexcused Absence Full Day', 'UA': 'Unexcused Absence Full Day', 'SS': 'Suspension', 'ASP': 'Alternative Study Program', 'ISS': 'In School Study'}
 
 if __name__ == '__main__':  # main file execution
@@ -213,7 +213,7 @@ if __name__ == '__main__':  # main file execution
                                                     # define headers
                                                     mime_message['To'] = toEmail # who the email gets sent to
                                                     mime_message['Subject'] = f'Ineligible Students to participate in {activityProper} for {todaysDatecode}'  # subject line of the email
-                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activityProper}. The following students are ineligible to participate today because of absences for more than 50% of the day.\nPlease reach out to the athletic department for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
+                                                    mime_message.set_content(f'You are receiving this email because you are a teacher or co-teacher for {activityProper}. The following students are ineligible to participate today because of absences for more than 50% of the day.\nPlease reach out to the athletic and activities department for clarification on any excused absences as they may still be eligible to participate depending on the type of excused absence.\n{absenceString}')  # body of the email
                                                     # encoded message
                                                     encoded_message = base64.urlsafe_b64encode(mime_message.as_bytes()).decode()
                                                     create_message = {'raw': encoded_message}
